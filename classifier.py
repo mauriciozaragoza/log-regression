@@ -7,7 +7,9 @@ import numpy as np
 n = 1001
 k = 6
 m = 600
+
 W = np.zeros((k, n))
+
 
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
@@ -40,8 +42,8 @@ def gradient(k, m, learning_rate, regularization, y, w, x):
 		for j in range(n):
 			sum = 0
 			for l in range(m):
-				sum += x[l][j] * y[l][i] - p(i, w, x[m]) - learning_rate*regularization*w[i][j]
-			cw[i][j] += learning_rate * sum
+				sum += x[l][j] * (y[l][i] - p(i, w, x[m]))
+			cw[i][j] += learning_rate * sum - learning_rate*regularization*w[i][j]
 	return cw
 
 def read_files(x_file, y_file):
