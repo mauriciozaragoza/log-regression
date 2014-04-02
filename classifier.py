@@ -47,8 +47,8 @@ def gradient(k, m, learning_rate, regularization, y, w, x):
 
 def read_files(x_file, y_file):
 	if os.path.isfile(x_file):
-		X = np.load(x_file)
-		Y = np.load(y_file)
+		X = np.loadtxt(x_file)
+		Y = np.loadtxt(y_file)
 
 		return (X, Y)
 	else:
@@ -68,8 +68,8 @@ def read_files(x_file, y_file):
 		X /= np.max(X)
 		X[:, 0] = 1.0
 
-		np.save(x_file, X)
-		np.save(y_file, Y)
+		np.savetxt(x_file, X)
+		np.savetxt(y_file, Y)
 
 		return (X, Y)
 
