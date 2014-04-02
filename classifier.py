@@ -10,7 +10,6 @@ m = 600
 
 W = np.zeros((k, n))
 
-
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
 x_file = "features.npy"
@@ -42,7 +41,7 @@ def gradient(k, m, learning_rate, regularization, y, w, x):
 		for j in range(n):
 			sum = 0
 			for l in range(m):
-				sum += x[l][j] * (y[l][i] - p(i, w, x[m]))
+				sum += x[l][j] * (y[l][i] - p(i, w, x[l]))
 			cw[i][j] += learning_rate * sum - learning_rate*regularization*w[i][j]
 	return cw
 
