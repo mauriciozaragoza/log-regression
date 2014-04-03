@@ -2,13 +2,7 @@ import os
 import scipy.io.wavfile
 from matplotlib.pyplot import specgram
 import numpy as np
-# import scikits.talkbox
-
-n = 1001
-k = 6
-m = 600
-
-W = np.zeros((k, n))
+import scikits.talkbox
 
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
@@ -22,20 +16,22 @@ genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
 def exp(yk, w, x):
 	values = range(0,6)
 	values.remove(yk)
-	w = w[v,:]
+	w = w[values,:]
 	return np.sum(np.exp(np.dot(w,x)))
 
 def p(yk, w, x):
 	return 1/(1 + exp(yk,w,x))
 
-def likelihood(m, k, y, w, x):
+def likelihood(x, y, w):
+	m, n, k = dimension(x, y)
 	sum = 0
 	for i in range(m):
 		for j in range(k):
-			sum += y[i][j] * log(p(j,w,x[i])) + ((1 - y[i][j])*log(1 - p(j,w,x[i]))) 
+			sum += y[i][j] * np.log(p(j,w,x[i])) + ((1 - y[i][j])*np.log(1 - p(j,w,x[i]))) 
 	return sum
 
-def gradient(k, m, learning_rate, regularization, y, w, x):
+def gradient(learning_rate, regularization, x, y, w):
+	m, n, k = dimension(x, y)
 	cw = np.copy(w)
 	for i in range(k):
 		for j in range(n):
@@ -44,6 +40,26 @@ def gradient(k, m, learning_rate, regularization, y, w, x):
 				sum += x[l][j] * (y[l][i] - p(i, w, x[l]))
 			cw[i][j] += learning_rate * sum - learning_rate*regularization*w[i][j]
 	return cw
+
+def classify(sample, w):
+	dot = np.dot(w, sample)
+	return 1/(1 + np.exp(dot))
+
+def dist(x,y):   
+	return np.sqrt(np.sum((x-y)**2))
+
+def learn(stop, learning_rate, regularization, x, y):
+	m, n, k = dimension(x, y)
+	w = np.zeros((k, n))
+	while True:
+		w2 = gradient(learning_rate, regularization, x, y, w)
+		d = dist(w, w2)
+		print d
+		if d < stop:
+			w = w2
+			break	
+		w = w2	
+	return w
 
 def read_files(x_file, y_file):
 	if os.path.isfile(x_file):
@@ -73,8 +89,11 @@ def read_files(x_file, y_file):
 
 		return (X, Y)
 
+def dimension(x, y):
+	return (len(x), len(x[0]), len(y[0]))
+
 # MAIN
 X, Y = read_files(x_file, y_file)
+X = X[:10]
 
-print X
-print Y
+w = learn(0.0001, 0.01, 0.01, X, Y)
