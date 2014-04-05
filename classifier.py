@@ -2,52 +2,53 @@ import os
 import scipy.io.wavfile
 from matplotlib.pyplot import specgram
 import numpy as np
-# import scikits.talkbox
 
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
 x_file = "features.npy"
 y_file = "classes.npy"
 
-num_samples = 100
-
 genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
 
 def p(w, x):
 	k = len(w)
-	py = []
+	m = len(x)
+	n = len(x[0])
+	
+	py = np.zeros((m, k), dtype=np.float128)
 
 	for j in range(k):
-		row = 1.0 / (1.0 + np.sum(np.exp(-x.dot(np.delete(w, j, 0).T)), 1))
-		py.append(row)
+		# row = np.exp(x.dot(w[j])) / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
+		# row = 1.0 / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
+		row = 1.0 / (1.0 + np.exp((x.dot(w[j].T))))
+		py[:, j] = row
 
-	return np.array(py).T
+	return py
 
 def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
 
 	py = p(w, x)
 
-	return (1.0 / m) * (np.sum(-y * np.log(py) - (1.0 - y) * np.log(1.0 - py)) + (regularization / (2 * m)) * np.sum(w * w)) / k
+	return -(1.0 / m) * (np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + (regularization / (2.0 * m)) * np.sum(w * w))
 
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
 
-	# cw = np.copy(w)
-
 	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
 	py = p(w, x)
 
-	# assert abs(np.sum(np.sum(py, 1) - 1.0)) < 0.5, "Probabilities do not sum to 1, aborting = " + str(abs(np.sum(np.sum(py, 1) - 1.0)))
+	d = np.zeros((k, n), dtype=np.float128)
+	
+	w2 = np.copy(w)
+	w2[:, 0] = 0
 
-	# get partial derivatives
-	d = (1 / m) * (py - y).T.dot(x) + (regularization / m * w)
-	d[:, 0] = 0
-
+	d2 = (1.0 / m) * (py - y).T.dot(x) + (regularization / m * w2)
+	
 	# Compute gradient ascent
-	w = w - learning_rate * d
+	w2 = w2 + learning_rate * d2
 
-	return w
+	return w2
 
 def classify(x, y, w):
 	probabilities = p(w, x)
@@ -79,7 +80,7 @@ def accuracy(c):
 
 def cross_validation(stop, learning_rate, regularization, x, y):
 	m, n, k = dimension(x, y)
-	# w = np.zeros((k, n))
+	# w = np.zeros((k, n), dtype=np.float128)
 	w = np.random.random((k, n))
 
 	x_orig = x
@@ -133,21 +134,28 @@ def learn(stop, learning_rate, regularization, x, y, w):
 	d1 = 1000000
 	d2 = 0
 
+	c1 = 1000000
+	c2 = 0
+
 	while True:
 		w2 = gradient(learning_rate, regularization, x, y, w)
-		d2 = dist(w, w2)
-		# print d2
-		# print "cost = " + str(cost(x, y, w2, regularization))
+		# d2 = dist(w, w2)
+		c2 = cost(x, y, w2, regularization)
 
-		if d2 > d1:
+		# print d2
+		# print "cost = " + str(c2)
+
+		if c2 > c1:
 			learning_rate /= 2.0
 			# print "Gradient ascient is diverging, adjusting learning rate to: " + str(learning_rate)
 
-		if d2 < stop:
+		if abs(c2 - c1) < stop:
 			w = w2
-			break	
+			break
+
 		w = w2	
 		d1 = d2
+		c1 = c2
 	return w
 
 def read_files(x_file, y_file):
@@ -155,11 +163,20 @@ def read_files(x_file, y_file):
 		X = np.loadtxt(x_file)
 		Y = np.loadtxt(y_file)
 
+		# feature scaling
+		X = (X - X.min(0)) / X.max(0)
+
+		# bias feature
+		X[:, 0] = 1.0
+
 		return (X, Y)
 	else:
 		print "X and Y matrix files not found, computing"
 
-		X = np.empty((num_samples * len(genres), n), dtype=np.float64)
+		m, n, k = 600, 1001, 6
+		num_samples = 100
+
+		X = np.empty((m, n), dtype=np.float128)
 		Y = np.zeros((m, k))
 
 		for i in range(len(genres)):
@@ -170,11 +187,12 @@ def read_files(x_file, y_file):
 				X[j + i * num_samples] = np.insert(abs(scipy.fft(x)[:n - 1]), [0], 1.0)
 				Y[j + i * num_samples, i] = 1.0
 
-		X /= np.max(X)
-		X[:, 0] = 1.0
+		X[:, 0] = np.random.random((m))
 
 		np.savetxt(x_file, X)
 		np.savetxt(y_file, Y)
+
+		# np.savetxt(x_file, X)
 
 		return (X, Y)
 
@@ -183,7 +201,5 @@ def dimension(x, y):
 
 # MAIN
 X, Y = read_files(x_file, y_file)
-# X = X[:10]
 
-cross_validation(0.0001, 1, 0.1, X, Y)
-
+cross_validation(0.001, 1, 0.01, X, Y)
