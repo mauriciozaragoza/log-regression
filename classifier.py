@@ -2,7 +2,7 @@ import os
 import scipy.io.wavfile
 from matplotlib.pyplot import specgram
 import numpy as np
-import scikits.talkbox
+# import scikits.talkbox
 
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
@@ -13,52 +13,141 @@ num_samples = 100
 
 genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
 
-def exp(yk, w, x):
-	values = range(0,6)
-	values.remove(yk)
-	w = w[values,:]
-	return np.sum(np.exp(np.dot(w,x)))
+def p(w, x):
+	k = len(w)
+	py = []
 
-def p(yk, w, x):
-	return 1/(1 + exp(yk,w,x))
+	for j in range(k):
+		row = 1.0 / (1.0 + np.sum(np.exp(-x.dot(np.delete(w, j, 0).T)), 1))
+		py.append(row)
 
-def likelihood(x, y, w):
+	return np.array(py).T
+
+def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
-	sum = 0
-	for i in range(m):
-		for j in range(k):
-			sum += y[i][j] * np.log(p(j,w,x[i])) + ((1 - y[i][j])*np.log(1 - p(j,w,x[i]))) 
-	return sum
+
+	py = p(w, x)
+
+	return (1.0 / m) * (np.sum(-y * np.log(py) - (1.0 - y) * np.log(1.0 - py)) + (regularization / (2 * m)) * np.sum(w * w)) / k
 
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
-	cw = np.copy(w)
-	for i in range(k):
-		for j in range(n):
-			sum = 0
-			for l in range(m):
-				sum += x[l][j] * (y[l][i] - p(i, w, x[l]))
-			cw[i][j] += learning_rate * sum - learning_rate*regularization*w[i][j]
-	return cw
 
-def classify(sample, w):
-	dot = np.dot(w, sample)
-	return 1/(1 + np.exp(dot))
+	# cw = np.copy(w)
+
+	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
+	py = p(w, x)
+
+	# assert abs(np.sum(np.sum(py, 1) - 1.0)) < 0.5, "Probabilities do not sum to 1, aborting = " + str(abs(np.sum(np.sum(py, 1) - 1.0)))
+
+	# get partial derivatives
+	d = (1 / m) * (py - y).T.dot(x) + (regularization / m * w)
+	d[:, 0] = 0
+
+	# Compute gradient ascent
+	w = w - learning_rate * d
+
+	return w
+
+def classify(x, y, w):
+	probabilities = p(w, x)
+
+	max_probabilities = probabilities.argmax(1)
+
+	for i in range(probabilities.shape[0]):
+		probabilities[i, :] = 0
+		probabilities[i, max_probabilities[i]] = 1
+
+	return probabilities
+
+def confusion(predicted_y, real_y):
+	m = len(predicted_y)
+	k = len(predicted_y[0])
+
+	c = np.zeros((k, k))
+
+	predicted_y_index = predicted_y.argmax(1)
+	real_y_index = real_y.argmax(1)
+
+	for i in range(m):
+		c[real_y_index[i], predicted_y_index[i]] += 1
+
+	return c
+
+def accuracy(c):
+	return sum([c[i][i] for i in range(6)]) / np.sum(c)
+
+def cross_validation(stop, learning_rate, regularization, x, y):
+	m, n, k = dimension(x, y)
+	# w = np.zeros((k, n))
+	w = np.random.random((k, n))
+
+	x_orig = x
+	y_orig = y
+
+	x = x.tolist()
+	y = y.tolist()
+
+	for j in range(10):	
+		offset = 0
+		skip = j * 10
+		training = []
+		training_y = []
+		validation = []
+		validation_y = []
+		for i in range(6):
+			offset = 100 * i
+			training += x[offset + skip : offset + skip + 10]
+			training_y += y[offset + skip : offset + skip + 10]
+
+			validation += x[offset : offset + skip]
+			validation += x[offset + skip + 10 : offset + 100]
+			validation_y += y[offset : offset + skip]
+			validation_y += y[offset + skip + 10 : offset + 100]
+
+			# print "training with: " + str((offset + skip, offset + skip + 10))
+			# print "validating with: " + str((offset, offset + skip)) + " and " + str((offset + skip + 10, offset + 100))
+
+		training = np.array(training)
+		training_y = np.array(training_y)
+		validation = np.array(validation)
+		validation_y = np.array(validation_y)
+
+		w2 = learn(stop, learning_rate, regularization, training, training_y, w)
+		predicted_y = classify(validation, validation_y, w2)
+
+		print "cost for cross-validation #" + str(j + 1) + " = " + str(cost(x_orig, y_orig, w2, regularization))
+		print "Confusion matrix = "
+		c = confusion(predicted_y, validation_y)
+		print c
+		print "Accuracy = " + str(accuracy(c))
 
 def dist(x,y):   
 	return np.sqrt(np.sum((x-y)**2))
 
-def learn(stop, learning_rate, regularization, x, y):
+def learn(stop, learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
-	w = np.zeros((k, n))
+
+	# print "first cost = "  + str(cost(x, y, w))
+
+	d1 = 1000000
+	d2 = 0
+
 	while True:
 		w2 = gradient(learning_rate, regularization, x, y, w)
-		d = dist(w, w2)
-		print d
-		if d < stop:
+		d2 = dist(w, w2)
+		# print d2
+		# print "cost = " + str(cost(x, y, w2, regularization))
+
+		if d2 > d1:
+			learning_rate /= 2.0
+			# print "Gradient ascient is diverging, adjusting learning rate to: " + str(learning_rate)
+
+		if d2 < stop:
 			w = w2
 			break	
 		w = w2	
+		d1 = d2
 	return w
 
 def read_files(x_file, y_file):
@@ -94,6 +183,7 @@ def dimension(x, y):
 
 # MAIN
 X, Y = read_files(x_file, y_file)
-X = X[:10]
+# X = X[:10]
 
-w = learn(0.0001, 0.01, 0.01, X, Y)
+cross_validation(0.0001, 1, 0.1, X, Y)
+
