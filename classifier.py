@@ -2,13 +2,7 @@ import os
 import scipy.io.wavfile
 from matplotlib.pyplot import specgram
 import numpy as np
-
-data_folder = 'opihi.cs.uvic.ca/sound/genres/'
-
-x_file = "features.npy"
-y_file = "classes.npy"
-
-genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
+import sys
 
 def p(w, x):
 	k = len(w)
@@ -200,6 +194,21 @@ def dimension(x, y):
 	return (len(x), len(x[0]), len(y[0]))
 
 # MAIN
-X, Y = read_files(x_file, y_file)
+data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
-cross_validation(0.001, 1, 0.01, X, Y)
+x_file = ""
+y_file = "classes.npy"
+
+genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
+
+if len(sys.argv) == 2:
+	if sys.argv[1] == "-f":
+		x_file = "features.npy"
+	elif sys.argv[1] == "-m":
+		x_file = "features_mfcc.npy"
+	else:
+		print "Error: Invalid arguments"
+		sys.exit()
+
+	X, Y = read_files(x_file, y_file)
+	cross_validation(0.001, 1, 0.1, X, Y)
