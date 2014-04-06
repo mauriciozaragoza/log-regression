@@ -1,20 +1,27 @@
 import os
 import scipy.io.wavfile
-from matplotlib.pyplot import specgram
 import numpy as np
 import sys
+
+import warnings
+warnings.filterwarnings('error')
 
 def p(w, x):
 	k = len(w)
 	m = len(x)
 	n = len(x[0])
 	
-	py = np.zeros((m, k), dtype=np.float128)
+	py = np.zeros((m, k), dtype=np.float64)
 
 	for j in range(k):
 		# row = np.exp(x.dot(w[j])) / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
-		# row = 1.0 / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
-		row = 1.0 / (1.0 + np.exp((x.dot(w[j].T))))
+		# row = 1.0 / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
+		# row = np.exp((x.dot(w[j].T))) / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
+		# assert (x.dot(w[j].T) < 200).all(), str(x.dot(w[j].T))
+		# print np.log(x.dot(w[j].T))
+		
+		row = 1.0 / (1.0 + np.exp(x.dot(w[j].T).clip(-30, 30)))
+
 		py[:, j] = row
 
 	return py
@@ -23,8 +30,15 @@ def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
 
 	py = p(w, x)
+	# py = np.zeros((m, k))
 
-	return -(1.0 / m) * (np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + (regularization / (2.0 * m)) * np.sum(w * w))
+	# assert not (py == 0).any()
+
+	# print py
+	a = np.log(py)
+	a2 = np.log(1.0 - py)
+
+	return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
 
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
@@ -32,12 +46,12 @@ def gradient(learning_rate, regularization, x, y, w):
 	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
 	py = p(w, x)
 
-	d = np.zeros((k, n), dtype=np.float128)
+	d = np.zeros((k, n), dtype=np.float64)
 	
 	w2 = np.copy(w)
 	w2[:, 0] = 0
 
-	d2 = (1.0 / m) * (py - y).T.dot(x) + (regularization / m * w2)
+	d2 = (1.0 / m) * (py - y).T.dot(x) - (regularization / m * w2)
 	
 	# Compute gradient ascent
 	w2 = w2 + learning_rate * d2
@@ -74,8 +88,8 @@ def accuracy(c):
 
 def cross_validation(stop, learning_rate, regularization, x, y):
 	m, n, k = dimension(x, y)
-	# w = np.zeros((k, n), dtype=np.float128)
-	w = np.random.random((k, n))
+	w = np.zeros((k, n), dtype=np.float64)
+	# w = np.random.random((k, n))
 
 	x_orig = x
 	y_orig = y
@@ -170,7 +184,7 @@ def read_files(x_file, y_file):
 		m, n, k = 600, 1001, 6
 		num_samples = 100
 
-		X = np.empty((m, n), dtype=np.float128)
+		X = np.empty((m, n), dtype=np.float64)
 		Y = np.zeros((m, k))
 
 		for i in range(len(genres)):
@@ -211,4 +225,4 @@ if len(sys.argv) == 2:
 		sys.exit()
 
 	X, Y = read_files(x_file, y_file)
-	cross_validation(0.001, 1, 0.1, X, Y)
+	cross_validation(0.00001, 1, 0.1, X, Y)
