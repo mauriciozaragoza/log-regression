@@ -7,24 +7,26 @@ import warnings
 warnings.filterwarnings('error')
 
 def p(w, x):
-	k = len(w)
-	m = len(x)
-	n = len(x[0])
+	# k = len(w)
+	# m = len(x)
+	# n = len(x[0])
 	
-	py = np.zeros((m, k), dtype=np.float64)
+	# py = np.zeros((m, k), dtype=np.float64)
 
-	for j in range(k):
-		# row = np.exp(x.dot(w[j])) / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
-		# row = 1.0 / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
-		# row = np.exp((x.dot(w[j].T))) / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
-		# assert (x.dot(w[j].T) < 200).all(), str(x.dot(w[j].T))
-		# print np.log(x.dot(w[j].T))
+	# for j in range(k):
+	# 	# row = np.exp(x.dot(w[j])) / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
+	# 	# row = 1.0 / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
+	# 	# row = np.exp((x.dot(w[j].T))) / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
+	# 	# assert (x.dot(w[j].T) < 200).all(), str(x.dot(w[j].T))
+	# 	# print np.log(x.dot(w[j].T))
 		
-		row = 1.0 / (1.0 + np.exp(x.dot(w[j].T).clip(-30, 30)))
+	# 	row = 1.0 / (1.0 + np.exp(x.dot(w[j].T).clip(-30, 30)))
 
-		py[:, j] = row
+	# 	py[:, j] = row
 
-	return py
+	return 1.0 / (1.0 + np.exp(x.dot(w.T).clip(-30, 30)))
+
+	# return py
 
 def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
