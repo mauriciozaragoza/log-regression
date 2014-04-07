@@ -1,5 +1,6 @@
 import os
 import scipy.io.wavfile
+import scipy.interpolate
 import numpy as np
 import sys
 
@@ -32,15 +33,17 @@ def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
 
 	py = p(w, x)
+
 	# py = np.zeros((m, k))
-
 	# assert not (py == 0).any()
-
 	# print py
+
 	a = np.log(py)
 	a2 = np.log(1.0 - py)
 
 	return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
+	
+	# return np.sum(y * a + (1.0 - y) * a2)
 
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
@@ -48,15 +51,17 @@ def gradient(learning_rate, regularization, x, y, w):
 	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
 	py = p(w, x)
 
-	d = np.zeros((k, n), dtype=np.float64)
+	# d = np.zeros((k, n), dtype=np.float64)
 	
 	w2 = np.copy(w)
 	w2[:, 0] = 0
 
+	# d2 = (y - py).T.dot(x) - (regularization * w2)
+	
 	d2 = (1.0 / m) * (py - y).T.dot(x) - (regularization / m * w2)
 	
 	# Compute gradient ascent
-	w2 = w2 + learning_rate * d2
+	w2 = w + learning_rate * d2
 
 	return w2
 
@@ -93,11 +98,22 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 	w = np.zeros((k, n), dtype=np.float64)
 	# w = np.random.random((k, n))
 
+
+	# w2 = learn(stop, learning_rate, regularization, x, y, w)
+	# predicted_y = classify(x, y, w2)
+
+	# print "Confusion matrix = "
+	# c = confusion(predicted_y, y)
+	# print c
+	# print "Accuracy = " + str(accuracy(c))
+
+
 	x_orig = x
 	y_orig = y
 
 	x = x.tolist()
 	y = y.tolist()
+	total_accuracy = 0
 
 	for j in range(10):	
 		offset = 0
@@ -108,13 +124,13 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 		validation_y = []
 		for i in range(6):
 			offset = 100 * i
-			training += x[offset + skip : offset + skip + 10]
-			training_y += y[offset + skip : offset + skip + 10]
+			validation += x[offset + skip : offset + skip + 10]
+			validation_y += y[offset + skip : offset + skip + 10]
 
-			validation += x[offset : offset + skip]
-			validation += x[offset + skip + 10 : offset + 100]
-			validation_y += y[offset : offset + skip]
-			validation_y += y[offset + skip + 10 : offset + 100]
+			training += x[offset : offset + skip]
+			training += x[offset + skip + 10 : offset + 100]
+			training_y += y[offset : offset + skip]
+			training_y += y[offset + skip + 10 : offset + 100]
 
 			# print "training with: " + str((offset + skip, offset + skip + 10))
 			# print "validating with: " + str((offset, offset + skip)) + " and " + str((offset + skip + 10, offset + 100))
@@ -127,11 +143,12 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 		w2 = learn(stop, learning_rate, regularization, training, training_y, w)
 		predicted_y = classify(validation, validation_y, w2)
 
-		print "cost for cross-validation #" + str(j + 1) + " = " + str(cost(x_orig, y_orig, w2, regularization))
+		# print "cost for cross-validation #" + str(j + 1) + " = " + str(cost(x_orig, y_orig, w2, regularization))
 		print "Confusion matrix = "
 		c = confusion(predicted_y, validation_y)
 		print c
-		print "Accuracy = " + str(accuracy(c))
+		total_accuracy += accuracy(c) * 100
+	print "Total accuracy: " + str(total_accuracy/10)
 
 def dist(x,y):   
 	return np.sqrt(np.sum((x-y)**2))
@@ -152,8 +169,14 @@ def learn(stop, learning_rate, regularization, x, y, w):
 		# d2 = dist(w, w2)
 		c2 = cost(x, y, w2, regularization)
 
+		# print w
+		# print w2
+
 		# print d2
 		# print "cost = " + str(c2)
+		# predicted_y = classify(xc, yc, w2)
+		# c = confusion(predicted_y, yc)
+		# print "Accuracy = " + str(accuracy(c))
 
 		if c2 > c1:
 			learning_rate /= 2.0
@@ -174,7 +197,13 @@ def read_files(x_file, y_file):
 		Y = np.loadtxt(y_file)
 
 		# feature scaling
-		X = (X - X.min(0)) / X.max(0)
+		# X = (X - X.min(0)) / X.max(0)
+
+		X[:, 0] = np.random.random((X.shape[0]))
+
+		for i in range(len(X[0])):
+			f = scipy.interpolate.interp1d([X[:, i].min(), X[:, i].max()], [-1.0, 1.0])
+			X[:, i] = f(X[:, i])
 
 		# bias feature
 		X[:, 0] = 1.0
@@ -227,4 +256,4 @@ if len(sys.argv) == 2:
 		sys.exit()
 
 	X, Y = read_files(x_file, y_file)
-	cross_validation(0.00001, 1, 0.1, X, Y)
+	cross_validation(0.0001, 1, 0.1, X, Y)
