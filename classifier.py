@@ -8,56 +8,25 @@ import warnings
 warnings.filterwarnings('error')
 
 def p(w, x):
-	# k = len(w)
-	# m = len(x)
-	# n = len(x[0])
-	
-	# py = np.zeros((m, k), dtype=np.float64)
-
-	# for j in range(k):
-	# 	# row = np.exp(x.dot(w[j])) / (1.0 + np.sum(np.exp(-(x.dot(np.delete(w, j, 0).T))), 1))
-	# 	# row = 1.0 / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
-	# 	# row = np.exp((x.dot(w[j].T))) / (1.0 + np.sum(np.exp((x.dot(np.delete(w, j, 0).T))), 1))
-	# 	# assert (x.dot(w[j].T) < 200).all(), str(x.dot(w[j].T))
-	# 	# print np.log(x.dot(w[j].T))
-		
-	# 	row = 1.0 / (1.0 + np.exp(x.dot(w[j].T).clip(-30, 30)))
-
-	# 	py[:, j] = row
-
 	return 1.0 / (1.0 + np.exp(x.dot(w.T).clip(-30, 30)))
-
-	# return py
 
 def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
-
 	py = p(w, x)
-
-	# py = np.zeros((m, k))
-	# assert not (py == 0).any()
-	# print py
-
-	a = np.log(py)
-	a2 = np.log(1.0 - py)
-
-	return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
+	# return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
+	return -(1.0 / k / m) * np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + ((regularization / (2.0 * k * m)) * np.sum(w * w))
 	
-	# return np.sum(y * a + (1.0 - y) * a2)
-
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
 
 	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
 	py = p(w, x)
-
-	# d = np.zeros((k, n), dtype=np.float64)
 	
 	w2 = np.copy(w)
 	w2[:, 0] = 0
 
 	# d2 = (y - py).T.dot(x) - (regularization * w2)
-	
+	# print (py - y)
 	d2 = (1.0 / m) * (py - y).T.dot(x) - (regularization / m * w2)
 	
 	# Compute gradient ascent
@@ -96,17 +65,6 @@ def accuracy(c):
 def cross_validation(stop, learning_rate, regularization, x, y):
 	m, n, k = dimension(x, y)
 	w = np.zeros((k, n), dtype=np.float64)
-	# w = np.random.random((k, n))
-
-
-	# w2 = learn(stop, learning_rate, regularization, x, y, w)
-	# predicted_y = classify(x, y, w2)
-
-	# print "Confusion matrix = "
-	# c = confusion(predicted_y, y)
-	# print c
-	# print "Accuracy = " + str(accuracy(c))
-
 
 	x_orig = x
 	y_orig = y
@@ -132,9 +90,6 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 			training_y += y[offset : offset + skip]
 			training_y += y[offset + skip + 10 : offset + 100]
 
-			# print "training with: " + str((offset + skip, offset + skip + 10))
-			# print "validating with: " + str((offset, offset + skip)) + " and " + str((offset + skip + 10, offset + 100))
-
 		training = np.array(training)
 		training_y = np.array(training_y)
 		validation = np.array(validation)
@@ -143,51 +98,43 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 		w2 = learn(stop, learning_rate, regularization, training, training_y, w)
 		predicted_y = classify(validation, validation_y, w2)
 
-		# print "cost for cross-validation #" + str(j + 1) + " = " + str(cost(x_orig, y_orig, w2, regularization))
-		print "Confusion matrix = "
 		c = confusion(predicted_y, validation_y)
-		print c
-		total_accuracy += accuracy(c) * 100
-	print "Total accuracy: " + str(total_accuracy/10)
+		total_accuracy += accuracy(c) * 10
 
-def dist(x,y):   
-	return np.sqrt(np.sum((x-y)**2))
+		print "Confusion matrix = "
+		print c
+		print "Current cross accuracy: " + str(accuracy(c) * 100) 
+		# if accuracy(c) * 100 > 43:
+		# 	np.savetxt("rank200.txt", rank(w2))
+		# 	print "JEJEJE"
+
+	print "Total accuracy: " + str(total_accuracy)
+
+def rank(w):
+	return np.argsort(np.sum(np.abs(w), axis = 0))
 
 def learn(stop, learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
-
-	# print "first cost = "  + str(cost(x, y, w))
-
-	d1 = 1000000
-	d2 = 0
 
 	c1 = 1000000
 	c2 = 0
 
 	while True:
 		w2 = gradient(learning_rate, regularization, x, y, w)
-		# d2 = dist(w, w2)
 		c2 = cost(x, y, w2, regularization)
 
-		# print w
-		# print w2
-
-		# print d2
-		# print "cost = " + str(c2)
-		# predicted_y = classify(xc, yc, w2)
-		# c = confusion(predicted_y, yc)
-		# print "Accuracy = " + str(accuracy(c))
+		# print c2
 
 		if c2 > c1:
 			learning_rate /= 2.0
 			# print "Gradient ascient is diverging, adjusting learning rate to: " + str(learning_rate)
 
 		if abs(c2 - c1) < stop:
+		# if c2 < 0.23:
 			w = w2
 			break
 
 		w = w2	
-		d1 = d2
 		c1 = c2
 	return w
 
@@ -195,9 +142,6 @@ def read_files(x_file, y_file):
 	if os.path.isfile(x_file):
 		X = np.loadtxt(x_file)
 		Y = np.loadtxt(y_file)
-
-		# feature scaling
-		# X = (X - X.min(0)) / X.max(0)
 
 		X[:, 0] = np.random.random((X.shape[0]))
 
@@ -231,8 +175,6 @@ def read_files(x_file, y_file):
 		np.savetxt(x_file, X)
 		np.savetxt(y_file, Y)
 
-		# np.savetxt(x_file, X)
-
 		return (X, Y)
 
 def dimension(x, y):
@@ -242,18 +184,23 @@ def dimension(x, y):
 data_folder = 'opihi.cs.uvic.ca/sound/genres/'
 
 x_file = ""
-y_file = "classes.npy"
+y_file = "classes.txt"
 
 genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
 
 if len(sys.argv) == 2:
 	if sys.argv[1] == "-f":
-		x_file = "features.npy"
+		x_file = "features.txt"
 	elif sys.argv[1] == "-m":
-		x_file = "features_mfcc.npy"
+		x_file = "features_mfcc.txt"
+	elif sys.argv[1] == "-r":
+		x_file = "features-200-fft.txt"
 	else:
 		print "Error: Invalid arguments"
 		sys.exit()
 
 	X, Y = read_files(x_file, y_file)
-	cross_validation(0.0001, 1, 0.1, X, Y)
+	cross_validation(0.000001, 1, 0.001, X, Y)
+
+# cross_validation(0.0001, .01, 0.01, X, Y) for Furier
+# cross_validation(0.000001, 1, 0.001, X, Y) for MFCC
