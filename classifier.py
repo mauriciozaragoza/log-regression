@@ -13,8 +13,11 @@ def p(w, x):
 def cost(x, y, w, regularization):
 	m, n, k = dimension(x, y)
 	py = p(w, x)
-	# return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
-	return -(1.0 / k / m) * np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + ((regularization / (2.0 * k * m)) * np.sum(w * w))
+	a = np.log(py)
+	a2 = np.log(1.0 - py)
+
+	return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
+	#return -(1.0 / k / m) * np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + ((regularization / (2.0 * k * m)) * np.sum(w * w))
 	
 def gradient(learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
@@ -190,17 +193,23 @@ genres = ['classical', 'jazz', 'country', 'pop', 'rock', 'metal']
 
 if len(sys.argv) == 2:
 	if sys.argv[1] == "-f":
+
 		x_file = "features.txt"
+		X, Y = read_files(x_file, y_file)
+		cross_validation(0.0001, .01, 0.01, X, Y)
+
 	elif sys.argv[1] == "-m":
+		
 		x_file = "features_mfcc.txt"
+		X, Y = read_files(x_file, y_file)
+		cross_validation(0.000001, 1, 0.001, X, Y)
+	
 	elif sys.argv[1] == "-r":
+		
 		x_file = "features-200-fft.txt"
+		X, Y = read_files(x_file, y_file)
+		cross_validation(0.00001, 1, 0.01, X, Y)
+	
 	else:
 		print "Error: Invalid arguments"
 		sys.exit()
-
-	X, Y = read_files(x_file, y_file)
-	cross_validation(0.000001, 1, 0.001, X, Y)
-
-# cross_validation(0.0001, .01, 0.01, X, Y) for Furier
-# cross_validation(0.000001, 1, 0.001, X, Y) for MFCC
