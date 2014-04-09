@@ -7,36 +7,35 @@ import sys
 import warnings
 warnings.filterwarnings('error')
 
+# Computes P(Y|X, W) as a matrix, exponent values are clamped to a range [-30, 30] to prevent overflows
 def p(w, x):
 	return 1.0 / (1.0 + np.exp(x.dot(w.T).clip(-30, 30)))
 
-def cost(x, y, w, regularization):
-	m, n, k = dimension(x, y)
+# Computes the likelihood of a matrix of weights
+def likelihood(x, y, w, regularization):
+	m = x.shape[0]
+
 	py = p(w, x)
-	a = np.log(py)
-	a2 = np.log(1.0 - py)
+	return -(1.0 / m) * (np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + (regularization / (2.0 * m)) * np.sum(w * w))
 
-	return -(1.0 / m) * (np.sum(y * a + (1.0 - y) * a2) + (regularization / (2.0 * m)) * np.sum(w * w))
-	#return -(1.0 / k / m) * np.sum(y * np.log(py) + (1.0 - y) * np.log(1.0 - py)) + ((regularization / (2.0 * k * m)) * np.sum(w * w))
-	
+# Computes the next step of gradient ascent
 def gradient(learning_rate, regularization, x, y, w):
-	m, n, k = dimension(x, y)
-
 	# Compute full P(Y|X, W) probability matrix with (m, k) dimensions
 	py = p(w, x)
 	
+	# The weight for the bias feature does not have a regularization penalty
+	# So it's weight is temporally set to 0 to remove it
 	w2 = np.copy(w)
 	w2[:, 0] = 0
 
-	# d2 = (y - py).T.dot(x) - (regularization * w2)
-	# print (py - y)
-	d2 = (1.0 / m) * (py - y).T.dot(x) - (regularization / m * w2)
+	# Computes the gradient for each feature and label
+	# yielding a (k, n)-dimensional matrix
+	d = (py - y).T.dot(x) - (regularization * w2)
 	
 	# Compute gradient ascent
-	w2 = w + learning_rate * d2
+	return w + learning_rate * d
 
-	return w2
-
+# 
 def classify(x, y, w):
 	probabilities = p(w, x)
 
@@ -68,6 +67,7 @@ def accuracy(c):
 def cross_validation(stop, learning_rate, regularization, x, y):
 	m, n, k = dimension(x, y)
 	w = np.zeros((k, n), dtype=np.float64)
+	# w = np.random.random((k, n))
 
 	x_orig = x
 	y_orig = y
@@ -104,17 +104,17 @@ def cross_validation(stop, learning_rate, regularization, x, y):
 		c = confusion(predicted_y, validation_y)
 		total_accuracy += accuracy(c) * 10
 
-		print "Confusion matrix = "
+		print "#" + str(j) + " cross-validation confusion matrix: "
 		print c
-		print "Current cross accuracy: " + str(accuracy(c) * 100) 
-		# if accuracy(c) * 100 > 43:
-		# 	np.savetxt("rank200.txt", rank(w2))
-		# 	print "JEJEJE"
+		print "Accuracy: " + str(accuracy(c) * 100)
+
+		if accuracy > 48:
+			np.savetxt("rank200.txt", rank(w2));
 
 	print "Total accuracy: " + str(total_accuracy)
 
 def rank(w):
-	return np.argsort(np.sum(np.abs(w), axis = 0))
+	return np.abs(w).argsort(1)[:, :21]
 
 def learn(stop, learning_rate, regularization, x, y, w):
 	m, n, k = dimension(x, y)
@@ -124,7 +124,7 @@ def learn(stop, learning_rate, regularization, x, y, w):
 
 	while True:
 		w2 = gradient(learning_rate, regularization, x, y, w)
-		c2 = cost(x, y, w2, regularization)
+		c2 = likelihood(x, y, w2, regularization)
 
 		# print c2
 
@@ -196,19 +196,19 @@ if len(sys.argv) == 2:
 
 		x_file = "features.txt"
 		X, Y = read_files(x_file, y_file)
-		cross_validation(0.0001, .01, 0.01, X, Y)
+		cross_validation(0.0001, 0.001, 0.001, X, Y)
 
 	elif sys.argv[1] == "-m":
 		
 		x_file = "features_mfcc.txt"
 		X, Y = read_files(x_file, y_file)
-		cross_validation(0.000001, 1, 0.001, X, Y)
+		cross_validation(0.00001, 0.001, 0.01, X, Y)
 	
 	elif sys.argv[1] == "-r":
 		
-		x_file = "features-200-fft.txt"
+		x_file = "features-120-fft.txt"
 		X, Y = read_files(x_file, y_file)
-		cross_validation(0.00001, 1, 0.01, X, Y)
+		cross_validation(0.0001, 0.001, 0.001, X, Y)
 	
 	else:
 		print "Error: Invalid arguments"
